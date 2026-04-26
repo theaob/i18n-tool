@@ -2,20 +2,63 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v*' # Trigger on tags starting with v (e.g., v1.0.0)
+      - 'v*'
 
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-
+  tag:
+    name: Check version and Tag
+    runs-on: ubuntu-latest
+    # Only run this job if pushing to main (not for tag pushes)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      new_tag: ${{ steps.check_tag.outputs.new_tag }}
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from package.json
+        id: get_version
+        run: echo "VERSION=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.get_version.outputs.VERSION }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.get_version.outputs.VERSION }} already exists. Skipping tagging."
+            echo "new_tag=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected: ${{ steps.get_version.outputs.VERSION }}"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag ${{ steps.get_version.outputs.VERSION }}
+            git push origin ${{ steps.get_version.outputs.VERSION }}
+            echo "new_tag=true" >> $GITHUB_OUTPUT
+          fi
+
+  release:
+    name: Build and Release
+    needs: tag
+    # Run if:
+    # 1. It was triggered by a tag push (v*)
+    # 2. It was triggered by main and the tag job created a new tag
+    if: |
+      always() && 
+      (startsWith(github.ref, 'refs/tags/v') || needs.tag.outputs.new_tag == 'true')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all tags so action-electron-builder can find the tag for the current commit
+          fetch-depth: 0
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -32,10 +75,5 @@ jobs:
       - name: Build and Release Electron App
         uses: samuelmeuli/action-electron-builder@v1
         with:
-          # GitHub token, automatically provided to the action
-          # (No need to define this secret in the repo settings)
-          github_token: ${{ secrets.github_token }}
-
-          # If the commit is tagged with a version (e.g., "v1.0.0"),
-          # release the app after building
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           release: true

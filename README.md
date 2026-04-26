@@ -33,10 +33,16 @@ An enterprise-grade, cross-platform desktop application for managing translation
    ```
 
 4. **Build for Production**
-   Package the app for distribution:
+   To package the app locally for distribution:
    ```bash
    npm run build
    ```
+
+5. **Creating a Release**
+   The project uses GitHub Actions for automated releases. To create a new release:
+   1. Update the `version` in `package.json`.
+   2. Commit and push the change to the `main` branch.
+   3. The CI will automatically create a git tag (e.g., `v1.0.1`) and publish a new GitHub Release with binaries for macOS, Windows, and Linux.
 
 ## Tech Stack
 
