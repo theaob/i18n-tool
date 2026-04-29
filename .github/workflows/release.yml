@@ -7,11 +7,14 @@ on:
     tags:
       - 'v*'
 
+# CRITICAL: Grant the GITHUB_TOKEN permission to push tags and create releases
+permissions:
+  contents: write
+
 jobs:
   tag:
     name: Check version and Tag
     runs-on: ubuntu-latest
-    # Only run this job if pushing to main (not for tag pushes)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
       new_tag: ${{ steps.check_tag.outputs.new_tag }}
@@ -43,9 +46,6 @@ jobs:
   release:
     name: Build and Release
     needs: tag
-    # Run if:
-    # 1. It was triggered by a tag push (v*)
-    # 2. It was triggered by main and the tag job created a new tag
     if: |
       always() && 
       (startsWith(github.ref, 'refs/tags/v') || needs.tag.outputs.new_tag == 'true')
@@ -57,7 +57,6 @@ jobs:
       - name: Check out Git repository
         uses: actions/checkout@v4
         with:
-          # Fetch all tags so action-electron-builder can find the tag for the current commit
           fetch-depth: 0
 
       - name: Install Node.js

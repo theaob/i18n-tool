@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Enterprise i18n translation management desktop application",
   "main": "electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theaob/i18n-tool.git"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
@@ -41,6 +45,12 @@
   "build": {
     "appId": "com.i18ntool.app",
     "productName": "i18n Tool",
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
+    ],
     "directories": {
       "output": "dist-electron"
     },
