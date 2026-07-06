@@ -10,7 +10,6 @@ import './plugins.js'; // register built-ins
 
 // ── Theme init ────────────────────────────────────────────────────────────────
 async function initTheme() {
-  const savedTheme = await window.electronAPI.getSetting('geminiApiKey');
   const theme = (await window.electronAPI.getSetting('theme')) || 'system';
   store.set('theme', theme);
   applyTheme(theme);
@@ -107,17 +106,17 @@ function renderHome(root) {
       </svg>
     </div>
     <h1>i18n Tool</h1>
-    <p>Manage your JSON translation files with AI-powered assistance. Open your locale files to get started.</p>
+    <p>Manage your translation files with AI-powered assistance. Open your locale files to get started.</p>
     <div class="home-view__actions">
       <div class="home-card" id="home-open">
         <div class="home-card__icon">📂</div>
         <div class="home-card__title">Open Files</div>
-        <div class="home-card__desc">Open one or more JSON locale files from disk</div>
+        <div class="home-card__desc">Open one or more JSON or TS locale files from disk</div>
       </div>
       <div class="home-card" id="home-drop">
         <div class="home-card__icon">🎯</div>
         <div class="home-card__title">Drag & Drop</div>
-        <div class="home-card__desc">Drop your JSON files anywhere on the window</div>
+        <div class="home-card__desc">Drop your locale files anywhere on the window</div>
       </div>
       <div class="home-card" id="home-settings">
         <div class="home-card__icon">⚙️</div>
@@ -133,7 +132,7 @@ function renderHome(root) {
   home.querySelector('#home-open').addEventListener('click', openFiles);
   home.querySelector('#home-settings').addEventListener('click', () => navigate('settings'));
   home.querySelector('#home-drop').addEventListener('click', () => {
-    Toast.info('Just drag & drop JSON files anywhere on this window!');
+    Toast.info('Just drag & drop JSON or TS files anywhere on this window!');
   });
 
   main.appendChild(sidebar);

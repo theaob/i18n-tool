@@ -43,12 +43,8 @@ export const fileService = {
     const files = await window.electronAPI.openFiles();
     return Promise.all(files.map(async ({ name, path: filePath, content, ext }) => {
       if (ext === '.ts') {
-        try {
-          const parsed = await window.electronAPI.parseTs(content);
-          return { name, path: filePath, data: flattenJson(parsed.data), meta: parsed.meta };
-        } catch (err) {
-          throw new Error(`Error parsing ${name}.ts: ${err.message}`);
-        }
+        const parsed = await window.electronAPI.parseTs(content);
+        return { name, path: filePath, data: flattenJson(parsed.data), meta: parsed.meta };
       } else {
         let parsed = {};
         try { parsed = JSON.parse(content); } catch { /* invalid JSON */ }

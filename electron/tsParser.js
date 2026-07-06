@@ -37,21 +37,21 @@ function parseTs(content) {
     } else if (/module\.exports\s*=\s*/.test(code)) {
       exportType = 'cjs';
       code = code.replace(/module\.exports\s*=\s*/, 'global.locale = ');
-    } else if (/export\s*=\s*/.test(code)) {
+    } else if (/export\s+=[^=]/.test(code)) {
       exportType = 'export-equals';
-      code = code.replace(/export\s*=\s*/, 'global.locale = ');
+      code = code.replace(/export\s+=\s*/, 'global.locale = ');
     }
   }
   
   const sandbox = { global: {} };
   vm.createContext(sandbox);
   try {
-    vm.runInContext(code, sandbox);
+    vm.runInContext(code, sandbox, { timeout: 5000 });
   } catch (err) {
     throw new Error(`Failed to parse TypeScript file content: ${err.message}`);
   }
   
-  const data = sandbox.global.locale || sandbox.module?.exports;
+  const data = sandbox.global.locale;
   if (!data || typeof data !== 'object') {
     throw new Error('No valid locale object was found exported from the file.');
   }

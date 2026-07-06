@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { fileService, unflattenJson } from './fileService.js';
+import { fileService } from './fileService.js';
 
 export const exportService = {
   /**

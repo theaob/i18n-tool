@@ -70,4 +70,26 @@ describe('parseTs', () => {
     `;
     expect(() => parseTs(content)).toThrow();
   });
+
+  test('parses nested objects with type annotations on named export', () => {
+    const content = `
+      export const translations: Record<string, Record<string, string>> = {
+        auth: {
+          login: "Sign In",
+          logout: "Sign Out"
+        },
+        nav: {
+          home: "Home"
+        }
+      };
+    `;
+    const result = parseTs(content);
+    expect(result.data).toEqual({
+      auth: { login: 'Sign In', logout: 'Sign Out' },
+      nav: { home: 'Home' }
+    });
+    expect(result.meta.exportType).toBe('named');
+    expect(result.meta.exportName).toBe('translations');
+    expect(result.meta.asConst).toBe(false);
+  });
 });

@@ -36,7 +36,7 @@ export function Sidebar(onNavigate) {
       <div class="sidebar__list" id="locale-list">
         ${locales.length === 0 ? `
           <div class="sidebar__empty">
-            No files open.<br/>Click the folder icon or drag & drop JSON files here.
+            No files open.<br/>Click the folder icon or drag & drop locale files here.
           </div>
         ` : locales.map(l => {
           const count = Object.keys(l.data).length;
