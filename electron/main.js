@@ -66,32 +66,41 @@ function createTray() {
 ipcMain.handle('dialog:openFiles', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Open Locale Files',
-    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    filters: [{ name: 'Locale Files', extensions: ['json', 'ts'] }],
     properties: ['openFile', 'multiSelections'],
   });
   if (result.canceled) return [];
   return result.filePaths.map((filePath) => {
     const content = fs.readFileSync(filePath, 'utf-8');
+    const ext = path.extname(filePath);
     return {
       path: filePath,
-      name: path.basename(filePath, '.json'),
+      name: path.basename(filePath, ext),
       content,
+      ext
     };
   });
 });
 
-ipcMain.handle('dialog:saveFile', async (_event, { filePath, content }) => {
+ipcMain.handle('dialog:saveFile', async (_event, { filePath, content, format }) => {
   if (filePath) {
     fs.writeFileSync(filePath, content, 'utf-8');
     return { success: true, path: filePath };
   }
+  const extensions = format === 'ts' ? ['ts'] : ['json'];
+  const name = format === 'ts' ? 'TypeScript Files' : 'JSON Files';
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Save Locale File',
-    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    filters: [{ name, extensions }],
   });
   if (result.canceled) return { success: false };
   fs.writeFileSync(result.filePath, content, 'utf-8');
   return { success: true, path: result.filePath };
+});
+
+ipcMain.handle('file:parseTs', (_event, content) => {
+  const { parseTs } = require('./tsParser');
+  return parseTs(content);
 });
 
 ipcMain.handle('dialog:saveCsv', async (_event, { content }) => {

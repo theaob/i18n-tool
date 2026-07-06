@@ -1,18 +1,15 @@
 import { store } from '../store.js';
-import { unflattenJson } from './fileService.js';
+import { fileService, unflattenJson } from './fileService.js';
 
 export const exportService = {
   /**
-   * Saves a locale's data back to its original file path as JSON.
+   * Saves a locale's data back to its original file path.
    */
   async exportJson(localeName) {
     const locales = store.get('locales');
     const locale = locales.find(l => l.name === localeName);
     if (!locale) return;
-    const nested = unflattenJson(locale.data);
-    const content = JSON.stringify(nested, null, 2);
-    const result = await window.electronAPI.saveFile({ filePath: locale.path, content });
-    return result;
+    return fileService.saveFile(locale.path, locale.data, locale.meta);
   },
 
   /**

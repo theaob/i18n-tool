@@ -40,7 +40,14 @@ function renderApp() {
     layout.style.gridTemplateRows = 'var(--titlebar-h) 1fr';
 
     const titlebar = makeTitlebar('Settings');
-    const settings = SettingsPanel(() => navigate('editor'));
+    const settings = SettingsPanel(() => {
+      const locales = store.get('locales') || [];
+      if (locales.length === 0) {
+        navigate('home');
+      } else {
+        navigate('editor');
+      }
+    });
 
     layout.appendChild(titlebar);
     layout.appendChild(settings);
@@ -158,11 +165,11 @@ function initDragDrop() {
   document.addEventListener('drop', async (e) => {
     e.preventDefault();
     overlay.classList.add('hidden');
-    const jsonFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.json'));
-    if (!jsonFiles.length) { Toast.warning('Only JSON files are supported'); return; }
+    const targetFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.json') || f.name.endsWith('.ts'));
+    if (!targetFiles.length) { Toast.warning('Only JSON and TS files are supported'); return; }
 
     try {
-      const files = await fileService.readDroppedFiles(jsonFiles);
+      const files = await fileService.readDroppedFiles(targetFiles);
       const existing = store.get('locales') || [];
       const existingNames = new Set(existing.map(l => l.name));
       const newOnes = files.filter(f => !existingNames.has(f.name));

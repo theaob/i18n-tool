@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
   saveFile: (args) => ipcRenderer.invoke('dialog:saveFile', args),
   saveCsv: (args) => ipcRenderer.invoke('dialog:saveCsv', args),
+  parseTs: (content) => ipcRenderer.invoke('file:parseTs', content),
 
   // AI Translation
   translate: (args) => ipcRenderer.invoke('ai:translate', args),

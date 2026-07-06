@@ -57,7 +57,7 @@ export function Toolbar() {
               display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;
               background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-primary);
               transition:background var(--transition);">
-              📄 Save JSON
+              📄 Save File
             </button>
             <div class="divider"></div>
             <button class="export-menu-item" data-export="csv" style="
@@ -102,8 +102,11 @@ export function Toolbar() {
         const type = item.dataset.export;
         try {
           if (type === 'json') {
+            const locales = store.get('locales') || [];
+            const locale = locales.find(l => l.name === activeLocale);
+            const format = locale?.meta?.format || 'json';
             const result = await exportService.exportJson(activeLocale);
-            if (result?.success) Toast.success(`Saved ${activeLocale}.json`);
+            if (result?.success) Toast.success(`Saved ${activeLocale}.${format}`);
           } else if (type === 'csv') {
             const result = await exportService.exportCsv();
             if (result?.success) Toast.success('Exported CSV');
