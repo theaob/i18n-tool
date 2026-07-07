@@ -16,7 +16,7 @@ export const Toast = {
     toast.className = `toast ${type}`;
 
     const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
-    toast.innerHTML = `<span style="font-size:15px">${icons[type] || 'ℹ'}</span><span>${message}</span>`;
+    toast.innerHTML = `<span style="font-size:15px;flex-shrink:0;margin-top:2px">${icons[type] || 'ℹ'}</span><span style="word-break:break-word;white-space:pre-wrap;max-height:250px;overflow-y:auto;padding-right:8px">${message}</span>`;
 
     c.appendChild(toast);
     setTimeout(() => {

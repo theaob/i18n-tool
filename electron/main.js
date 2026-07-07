@@ -38,6 +38,13 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      require('electron').shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -113,8 +120,8 @@ ipcMain.handle('dialog:saveCsv', async (_event, { content }) => {
   return { success: true, path: result.filePath };
 });
 
-ipcMain.handle('ai:translate', async (_event, { text, sourceLang, targetLang, apiKey }) => {
-  return translateWithGemini({ text, sourceLang, targetLang, apiKey });
+ipcMain.handle('ai:translate', async (_event, { text, sourceLang, targetLang, apiKey, model }) => {
+  return translateWithGemini({ text, sourceLang, targetLang, apiKey, model });
 });
 
 ipcMain.handle('store:get', (_event, key) => {

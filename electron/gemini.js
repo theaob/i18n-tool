@@ -7,13 +7,14 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  * @param {string} opts.sourceLang - BCP-47 language code e.g. "en"
  * @param {string} opts.targetLang - BCP-47 language code e.g. "tr"
  * @param {string} opts.apiKey - Gemini API key
+ * @param {string} [opts.model] - The Gemini model to use
  * @returns {Promise<string>} - Translated string
  */
-async function translateWithGemini({ text, sourceLang, targetLang, apiKey }) {
+async function translateWithGemini({ text, sourceLang, targetLang, apiKey, model = 'gemini-2.0-flash' }) {
   if (!apiKey) throw new Error('Gemini API key is not configured. Go to Settings to add it.');
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const genModel = genAI.getGenerativeModel({ model });
 
   const prompt = `You are a professional software localization expert. Translate the following UI string from ${sourceLang} to ${targetLang}.
 
@@ -26,7 +27,7 @@ Rules:
 
 Source string: ${text}`;
 
-  const result = await model.generateContent(prompt);
+  const result = await genModel.generateContent(prompt);
   const response = await result.response;
   return response.text().trim();
 }
@@ -38,13 +39,14 @@ Source string: ${text}`;
  * @param {string} opts.sourceLang
  * @param {string} opts.targetLang
  * @param {string} opts.apiKey
+ * @param {string} [opts.model]
  * @returns {Promise<Record<string,string>>} - { key: translatedText }
  */
-async function batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey }) {
+async function batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model = 'gemini-2.0-flash' }) {
   if (!apiKey) throw new Error('Gemini API key is not configured.');
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const genModel = genAI.getGenerativeModel({ model });
 
   const keys = Object.keys(entries);
   const lines = keys.map((k, i) => `${i + 1}. [${k}]: ${entries[k]}`).join('\n');
@@ -60,7 +62,7 @@ Rules:
 Strings to translate:
 ${lines}`;
 
-  const result = await model.generateContent(prompt);
+  const result = await genModel.generateContent(prompt);
   const response = await result.response;
   const responseText = response.text().trim();
 

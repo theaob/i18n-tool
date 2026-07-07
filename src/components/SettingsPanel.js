@@ -9,6 +9,7 @@ export function SettingsPanel(onBack) {
   async function render() {
     const currentTheme = store.get('theme') || 'system';
     const apiKey = store.get('geminiApiKey') || '';
+    const currentModel = store.get('geminiModel') || 'gemini-2.0-flash';
     const allPlugins = plugins.getAll();
 
     el.innerHTML = `
@@ -29,11 +30,19 @@ export function SettingsPanel(onBack) {
             placeholder="AIza…" value="${apiKey}" autocomplete="off" />
           <span class="hint">
             Get a free key at 
-            <a href="#" id="gemini-link">aistudio.google.com</a>.
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com</a>.
             Stored securely on disk, never sent to any third party.
           </span>
         </div>
-        <button class="btn btn-primary btn-sm" id="save-api-key">Save API Key</button>
+        <div class="form-group" style="margin-top:16px">
+          <label for="gemini-model">Model</label>
+          <select id="gemini-model" class="form-input">
+            <option value="gemini-2.0-flash" ${currentModel === 'gemini-2.0-flash' ? 'selected' : ''}>Gemini 2.0 Flash (Fast)</option>
+            <option value="gemini-1.5-pro" ${currentModel === 'gemini-1.5-pro' ? 'selected' : ''}>Gemini 1.5 Pro (Advanced)</option>
+            <option value="gemini-1.5-flash" ${currentModel === 'gemini-1.5-flash' ? 'selected' : ''}>Gemini 1.5 Flash (Legacy)</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="save-api-key" style="margin-top:16px">Save AI Settings</button>
       </div>
 
       <div class="settings-section">
@@ -89,12 +98,15 @@ export function SettingsPanel(onBack) {
 
     el.querySelector('#back-btn').addEventListener('click', onBack);
 
-    // API key save
+    // AI save
     el.querySelector('#save-api-key').addEventListener('click', async () => {
       const key = el.querySelector('#gemini-key').value.trim();
+      const model = el.querySelector('#gemini-model').value;
       store.set('geminiApiKey', key);
+      store.set('geminiModel', model);
       await window.electronAPI.setSetting('geminiApiKey', key);
-      Toast.success('API key saved');
+      await window.electronAPI.setSetting('geminiModel', model);
+      Toast.success('AI settings saved');
     });
 
     // Theme
