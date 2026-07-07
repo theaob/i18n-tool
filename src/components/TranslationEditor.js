@@ -148,6 +148,45 @@ export function TranslationEditor() {
     });
 
     tbody.appendChild(fragment);
+
+    // Batch translate listeners
+    el.querySelectorAll('.btn-translate-all').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const targetLocale = btn.dataset.locale;
+        
+        // Find missing keys
+        const missingEntries = {};
+        keys.forEach(key => {
+          if (translationService.getKeyStatus(key, baseLocale, targetLocale) === 'missing') {
+            missingEntries[key] = base.data[key];
+          }
+        });
+
+        const numMissing = Object.keys(missingEntries).length;
+        if (numMissing === 0) {
+          Toast.info(`No missing keys for ${targetLocale}`);
+          return;
+        }
+
+        if (!confirm(`Translate ${numMissing} missing keys for ${targetLocale} with AI? This may take a moment.`)) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Translating...';
+
+        try {
+          const results = await aiService.batchTranslate(missingEntries, baseLocale, targetLocale);
+          // Update translations
+          Object.entries(results).forEach(([k, v]) => {
+            translationService.updateTranslation(targetLocale, k, v);
+          });
+          Toast.success(`Successfully translated ${numMissing} keys to ${targetLocale}`);
+        } catch (err) {
+          Toast.error(err.message);
+        } finally {
+          scheduleRender();
+        }
+      });
+    });
   }
 
   store.subscribe('locales', scheduleRender);
