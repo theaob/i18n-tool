@@ -1,6 +1,7 @@
 import { store } from '../store.js';
 import { fileService } from '../services/fileService.js';
 import { Toast } from './Toast.js';
+import { Modal } from './Modal.js';
 
 // Locale name → flag emoji mapping (common ones)
 const FLAGS = {
@@ -27,11 +28,18 @@ export function Sidebar(onNavigate) {
     el.innerHTML = `
       <div class="sidebar__header">
         <span>Locales</span>
-        <button class="btn-icon" id="open-files-btn" title="Open JSON files (⌘O)">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-          </svg>
-        </button>
+        <div style="display:flex;gap:4px">
+          <button class="btn-icon" id="create-locale-btn" title="Create new locale" ${locales.length === 0 ? 'disabled' : ''}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <button class="btn-icon" id="open-files-btn" title="Open locale files (⌘O)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="sidebar__list" id="locale-list">
         ${locales.length === 0 ? `
@@ -63,6 +71,7 @@ export function Sidebar(onNavigate) {
     `;
 
     el.querySelector('#open-files-btn').addEventListener('click', openFiles);
+    el.querySelector('#create-locale-btn')?.addEventListener('click', showCreateLocaleModal);
     el.querySelector('#settings-btn').addEventListener('click', () => onNavigate('settings'));
 
     el.querySelectorAll('.sidebar__item').forEach(item => {
@@ -81,6 +90,100 @@ export function Sidebar(onNavigate) {
         Toast.info(`"${name}" set as base locale`);
       });
     });
+  }
+
+  function showCreateLocaleModal() {
+    const locales = store.get('locales') || [];
+    const baseLocale = store.get('baseLocale');
+    const base = locales.find(l => l.name === baseLocale) || locales[0];
+    if (!base) return;
+
+    const body = document.createElement('div');
+    body.innerHTML = `
+      <div class="form-group">
+        <label for="new-locale-input">Language code</label>
+        <input type="text" id="new-locale-input" class="form-input"
+          placeholder="e.g. DE, FR, ZH-CN" style="text-transform:uppercase" />
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
+          The new locale will be created with all ${Object.keys(base.data).length} keys from <strong>${base.name}</strong> (empty values).
+          ${base.sourceFiles ? `<br/>Source files will be created for each feature: ${base.sourceFiles.map(sf => sf.feature).join(', ')}` : ''}
+        </div>
+      </div>
+    `;
+
+    const footer = document.createElement('div');
+    footer.style.display = 'flex';
+    footer.style.gap = '8px';
+    footer.innerHTML = `
+      <button class="btn btn-secondary" id="cancel-create">Cancel</button>
+      <button class="btn btn-primary" id="confirm-create">Create Locale</button>
+    `;
+
+    const { close } = Modal({ title: 'Create New Locale', body, footer });
+
+    footer.querySelector('#cancel-create').addEventListener('click', close);
+    footer.querySelector('#confirm-create').addEventListener('click', () => {
+      const code = body.querySelector('#new-locale-input').value.trim().toUpperCase();
+      if (!code) {
+        Toast.warning('Please enter a language code');
+        return;
+      }
+      if (locales.find(l => l.name === code)) {
+        Toast.warning(`Locale "${code}" already exists`);
+        return;
+      }
+
+      createLocale(code, base);
+      close();
+    });
+
+    // Enter to confirm
+    body.querySelector('#new-locale-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') footer.querySelector('#confirm-create').click();
+    });
+
+    setTimeout(() => body.querySelector('#new-locale-input').focus(), 100);
+  }
+
+  function createLocale(code, base) {
+    // Build empty data with all keys from the base
+    const emptyData = {};
+    for (const key of Object.keys(base.data)) {
+      emptyData[key] = '';
+    }
+
+    const newLocale = {
+      name: code,
+      path: null,
+      data: emptyData,
+      meta: { format: base.meta?.format || 'json' },
+    };
+
+    // For merged locales, create matching sourceFiles entries
+    if (base.sourceFiles && base.sourceFiles.length > 0) {
+      newLocale.meta = { format: 'merged' };
+      newLocale.sourceFiles = base.sourceFiles.map(sf => {
+        // Derive new file path: replace the old language suffix with the new code
+        let newPath = null;
+        if (sf.path) {
+          const dir = sf.path.replace(/[/\\][^/\\]+$/, '');
+          const ext = sf.path.match(/\.[^.]+$/)?.[0] || '.ts';
+          newPath = `${dir}/${sf.feature}${code}${ext}`;
+        }
+        return {
+          feature: sf.feature,
+          path: newPath,
+          meta: { ...sf.meta },
+          keys: [...sf.keys],
+        };
+      });
+    }
+
+    const locales = store.get('locales') || [];
+    store.set('locales', [...locales, newLocale]);
+    store.set('activeLocale', code);
+    onNavigate('editor');
+    Toast.success(`Created locale "${code}" with ${Object.keys(emptyData).length} keys`);
   }
 
   async function openFiles() {
@@ -111,3 +214,4 @@ export function Sidebar(onNavigate) {
 
   return { el, openFiles };
 }
+
