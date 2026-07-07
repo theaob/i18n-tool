@@ -85,12 +85,12 @@ export function SettingsPanel(onBack) {
         <h3>Keyboard Shortcuts</h3>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
           ${[
-            ['Open files', '⌘ O'],
-            ['Search', '⌘ K'],
-            ['Add key', '⌘ N'],
-            ['Export JSON', '⌘ E'],
-            ['Close detail panel', 'Esc'],
-          ].map(([action, shortcut]) => `
+        ['Open files', '⌘ O'],
+        ['Search', '⌘ K'],
+        ['Add key', '⌘ N'],
+        ['Export JSON', '⌘ E'],
+        ['Close detail panel', 'Esc'],
+      ].map(([action, shortcut]) => `
             <div style="display:flex;justify-content:space-between;align-items:center">
               <span style="color:var(--text-secondary)">${action}</span>
               <kbd>${shortcut}</kbd>
@@ -133,12 +133,12 @@ export function SettingsPanel(onBack) {
         if (fetched && fetched.length > 0) {
           store.set('geminiAvailableModels', fetched);
           await window.electronAPI.setSetting('geminiAvailableModels', fetched);
-          
+
           // Use the latest selectedModel instead of currentModel to preserve selection
           select.innerHTML = fetched.map(m => `
             <option value="${m.name}" ${selectedModel === m.name ? 'selected' : ''}>${m.displayName}</option>
           `).join('');
-          
+
           // Re-update the selectedModel to the select value in case the previous selection is not in the list
           selectedModel = select.value;
 
