@@ -37,19 +37,10 @@ export function SettingsPanel(onBack) {
         <div class="form-group" style="margin-top:16px">
           <label for="gemini-model">Model</label>
           <select id="gemini-model" class="form-input">
-            <optgroup label="Gemini 3 Series">
-              <option value="gemini-3.1-pro" ${currentModel === 'gemini-3.1-pro' ? 'selected' : ''}>Gemini 3.1 Pro (Advanced)</option>
-              <option value="gemini-3.1-flash" ${currentModel === 'gemini-3.1-flash' ? 'selected' : ''}>Gemini 3.1 Flash (Fast)</option>
-            </optgroup>
-            <optgroup label="Gemini 2.5 Series">
-              <option value="gemini-2.5-pro" ${currentModel === 'gemini-2.5-pro' ? 'selected' : ''}>Gemini 2.5 Pro (Balanced)</option>
-              <option value="gemini-2.5-flash" ${currentModel === 'gemini-2.5-flash' ? 'selected' : ''}>Gemini 2.5 Flash (Fast)</option>
-            </optgroup>
-            <optgroup label="Older Models">
-              <option value="gemini-2.0-flash" ${currentModel === 'gemini-2.0-flash' ? 'selected' : ''}>Gemini 2.0 Flash</option>
-              <option value="gemini-1.5-pro" ${currentModel === 'gemini-1.5-pro' ? 'selected' : ''}>Gemini 1.5 Pro</option>
-              <option value="gemini-1.5-flash" ${currentModel === 'gemini-1.5-flash' ? 'selected' : ''}>Gemini 1.5 Flash</option>
-            </optgroup>
+            <option value="gemini-2.0-flash" ${currentModel === 'gemini-2.0-flash' ? 'selected' : ''}>Gemini 2.0 Flash (Fast)</option>
+            <option value="gemini-1.5-pro-latest" ${currentModel === 'gemini-1.5-pro-latest' ? 'selected' : ''}>Gemini 1.5 Pro (Advanced)</option>
+            <option value="gemini-1.5-flash-latest" ${currentModel === 'gemini-1.5-flash-latest' ? 'selected' : ''}>Gemini 1.5 Flash</option>
+            <option value="gemini-pro" ${currentModel === 'gemini-pro' ? 'selected' : ''}>Gemini Pro 1.0 (Legacy)</option>
           </select>
         </div>
         <button class="btn btn-primary btn-sm" id="save-api-key" style="margin-top:16px">Save AI Settings</button>
