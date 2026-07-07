@@ -1,5 +1,7 @@
 import { store } from '../store.js';
 import { translationService } from '../services/translationService.js';
+import { aiService } from '../services/aiService.js';
+import { Toast } from './Toast.js';
 
 export function TranslationEditor() {
   const el = document.createElement('div');
@@ -51,7 +53,12 @@ export function TranslationEditor() {
             <tr>
               <th class="th-key">Key</th>
               ${orderedLocales.map((l, i) => `
-                <th class="th-locale">${l.name}${l.name === baseLocale ? ' <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>' : ''}</th>
+                <th class="th-locale">
+                  ${l.name}
+                  ${l.name === baseLocale 
+                    ? ' <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>' 
+                    : ` <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" title="Translate all missing keys with AI">✨ Translate Missing</button>`}
+                </th>
               `).join('')}
             </tr>
           </thead>

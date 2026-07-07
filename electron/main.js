@@ -124,6 +124,11 @@ ipcMain.handle('ai:translate', async (_event, { text, sourceLang, targetLang, ap
   return translateWithGemini({ text, sourceLang, targetLang, apiKey, model });
 });
 
+ipcMain.handle('ai:batchTranslate', async (_event, { entries, sourceLang, targetLang, apiKey, model }) => {
+  const { batchTranslateWithGemini } = require('./gemini');
+  return batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model });
+});
+
 ipcMain.handle('store:get', (_event, key) => {
   return store ? store.get(key) : undefined;
 });
