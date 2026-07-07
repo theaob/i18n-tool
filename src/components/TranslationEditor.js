@@ -15,7 +15,6 @@ export function TranslationEditor() {
   function render() {
     const locales = store.get('locales') || [];
     const baseLocale = store.get('baseLocale');
-    const activeLocale = store.get('activeLocale');
     const selectedKey = store.get('selectedKey');
 
     if (!locales.length) {
@@ -26,26 +25,34 @@ export function TranslationEditor() {
     const keys = translationService.getFilteredKeys();
     const stats = translationService.getStats();
     const base = locales.find(l => l.name === baseLocale);
-    const active = locales.find(l => l.name === activeLocale);
+
+    // Order locales: base first, then the rest
+    const orderedLocales = [];
+    if (base) orderedLocales.push(base);
+    locales.forEach(l => { if (l.name !== baseLocale) orderedLocales.push(l); });
+
+    // Determine if we need feature grouping
+    const hasFeatureGroups = locales.some(l => l.sourceFiles);
+
+    // Count total columns: key + N locales
+    const colCount = 1 + orderedLocales.length;
 
     el.innerHTML = `
       <div class="editor-stats">
         <span>📋 ${stats.total} keys</span>
-        ${baseLocale !== activeLocale ? `
-          <span style="color:var(--success)">✓ ${stats.ok} translated</span>
-          <span style="color:var(--danger)">⚠ ${stats.missing} missing</span>
-          <span style="color:var(--warning)">≈ ${stats.untranslated} same as base</span>
-        ` : ''}
+        <span style="color:var(--success)">✓ ${stats.ok} translated</span>
+        <span style="color:var(--danger)">⚠ ${stats.missing} missing</span>
+        <span style="color:var(--warning)">≈ ${stats.untranslated} same as base</span>
         <span style="margin-left:auto;color:var(--text-muted)">${keys.length} shown</span>
       </div>
       <div class="table-wrapper">
-        <table class="translation-table">
+        <table class="translation-table translation-table--multi">
           <thead>
             <tr>
-              <th>Key</th>
-              <th>${baseLocale || 'Base'} <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span></th>
-              <th>${activeLocale || 'Target'}</th>
-              <th>Status</th>
+              <th class="th-key">Key</th>
+              ${orderedLocales.map((l, i) => `
+                <th class="th-locale">${l.name}${l.name === baseLocale ? ' <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>' : ''}</th>
+              `).join('')}
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
@@ -55,9 +62,6 @@ export function TranslationEditor() {
 
     const tbody = el.querySelector('#table-body');
     const fragment = document.createDocumentFragment();
-
-    // Determine if we need feature grouping
-    const hasFeatureGroups = (base?.sourceFiles || active?.sourceFiles);
 
     let lastFeature = null;
 
@@ -71,49 +75,63 @@ export function TranslationEditor() {
           const headerTr = document.createElement('tr');
           headerTr.className = 'feature-group-header';
           const featureKeys = keys.filter(k => k.startsWith(`${feature}.`));
-          const missingCount = baseLocale && activeLocale && baseLocale !== activeLocale
-            ? featureKeys.filter(k => translationService.getKeyStatus(k, baseLocale, activeLocale) === 'missing').length
-            : 0;
+
+          // Count missing across all non-base locales
+          let totalMissing = 0;
+          if (base) {
+            orderedLocales.forEach(l => {
+              if (l.name !== baseLocale) {
+                totalMissing += featureKeys.filter(k =>
+                  translationService.getKeyStatus(k, baseLocale, l.name) === 'missing'
+                ).length;
+              }
+            });
+          }
+
           headerTr.innerHTML = `
-            <td colspan="4" class="feature-group-cell">
+            <td colspan="${colCount}" class="feature-group-cell">
               <span class="feature-group-name">📁 ${feature}</span>
               <span class="feature-group-count">${featureKeys.length} keys</span>
-              ${missingCount > 0 ? `<span class="feature-group-missing">⚠ ${missingCount} missing</span>` : ''}
+              ${totalMissing > 0 ? `<span class="feature-group-missing">⚠ ${totalMissing} missing</span>` : ''}
             </td>
           `;
           fragment.appendChild(headerTr);
         }
       }
 
-      const baseVal = base?.data[key] ?? '';
-      const activeVal = active?.data[key] ?? '';
-      const status = baseLocale && activeLocale && baseLocale !== activeLocale
-        ? translationService.getKeyStatus(key, baseLocale, activeLocale)
-        : 'ok';
-
-      const rowClass = status === 'missing' ? 'row-missing' : '';
-      const isSelected = key === selectedKey;
-      const badge = {
-        ok: '<span class="badge badge-ok">✓</span>',
-        missing: '<span class="badge badge-missing">✕</span>',
-        untranslated: '<span class="badge badge-same">≈</span>',
-      }[status];
-
       // Show the display key (strip feature prefix for grouped views)
       const displayKey = hasFeatureGroups && key.indexOf('.') > 0
         ? key.slice(key.indexOf('.') + 1)
         : key;
 
-      const tr = document.createElement('tr');
-      tr.className = `${rowClass} ${isSelected ? 'selected' : ''}`;
-      tr.dataset.key = key;
-      tr.innerHTML = `
-        <td class="td-key" title="${key}">${displayKey}</td>
-        <td class="td-value ${!baseVal ? 'empty' : ''}" title="${baseVal}">${baseVal || '—'}</td>
-        <td class="td-value ${!activeVal ? 'empty' : ''}" title="${activeVal}">${activeVal || '—'}</td>
-        <td class="td-status">${badge}</td>
-      `;
+      // Determine if any non-base locale is missing this key
+      const hasMissing = base && orderedLocales.some(l =>
+        l.name !== baseLocale && translationService.getKeyStatus(key, baseLocale, l.name) === 'missing'
+      );
 
+      const isSelected = key === selectedKey;
+
+      const tr = document.createElement('tr');
+      tr.className = `${hasMissing ? 'row-missing' : ''} ${isSelected ? 'selected' : ''}`;
+      tr.dataset.key = key;
+
+      // Build cells: key + one cell per locale
+      let cells = `<td class="td-key" title="${key}">${displayKey}</td>`;
+      orderedLocales.forEach(l => {
+        const val = l.data[key] ?? '';
+        const isBase = l.name === baseLocale;
+        const isEmpty = !val;
+        const isSameAsBase = !isBase && base && val && val === base.data[key];
+
+        let cellClass = 'td-value';
+        if (isEmpty && !isBase) cellClass += ' empty cell-missing';
+        else if (isEmpty) cellClass += ' empty';
+        else if (isSameAsBase) cellClass += ' cell-same';
+
+        cells += `<td class="${cellClass}" title="${val}">${val || '—'}</td>`;
+      });
+
+      tr.innerHTML = cells;
       tr.addEventListener('click', () => {
         store.set('selectedKey', key);
         store.set('isDetailOpen', true);

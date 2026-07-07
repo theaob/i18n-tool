@@ -303,10 +303,13 @@ a { color: var(--accent); text-decoration: none; }
 }
 .editor-stats span { display: flex; align-items: center; gap: 4px; }
 
-.table-wrapper { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.table-wrapper { flex: 1; overflow: auto; }
 .translation-table {
   width: 100%; border-collapse: collapse;
   table-layout: fixed;
+}
+.translation-table--multi {
+  min-width: 600px;
 }
 .translation-table thead { position: sticky; top: 0; z-index: 10; }
 .translation-table th {
@@ -320,9 +323,8 @@ a { color: var(--accent); text-decoration: none; }
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.translation-table th:first-child { width: 35%; }
-.translation-table th:nth-child(2), .translation-table th:nth-child(3) { width: 29%; }
-.translation-table th:last-child { width: 7%; }
+.translation-table .th-key { width: 25%; min-width: 180px; }
+.translation-table .th-locale { }
 
 .translation-table tbody tr {
   border-bottom: 1px solid var(--border-subtle);
@@ -351,7 +353,17 @@ a { color: var(--accent); text-decoration: none; }
 }
 .td-value { color: var(--text-primary); font-size: 13px; }
 .td-value.empty { color: var(--text-muted); font-style: italic; }
+.td-value.cell-missing {
+  color: var(--danger);
+  font-weight: 500;
+}
+.td-value.cell-same {
+  color: var(--warning);
+  font-style: italic;
+  opacity: 0.8;
+}
 .td-status { text-align: center; }
+
 
 /* ── Feature group headers ── */
 .feature-group-header {
