@@ -3,6 +3,11 @@ import { translationService } from '../services/translationService.js';
 import { aiService } from '../services/aiService.js';
 import { Toast } from './Toast.js';
 
+// Module-level variables to persist across re-creation of TranslationEditor component
+const translatingLocales = {}; // { [localeName]: { current: number, total: number } }
+let lastScrollTop = 0;
+let lastScrollLeft = 0;
+
 export function TranslationEditor() {
   const el = document.createElement('div');
   el.className = 'editor-area';
@@ -52,20 +57,51 @@ export function TranslationEditor() {
           <thead>
             <tr>
               <th class="th-key">Key</th>
-              ${orderedLocales.map((l, i) => `
-                <th class="th-locale">
-                  ${l.name}
-                  ${l.name === baseLocale 
-                    ? ' <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>' 
-                    : ` <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" title="Translate all missing keys with AI">✨ Translate Missing</button>`}
-                </th>
-              `).join('')}
+              ${orderedLocales.map((l, i) => {
+                if (l.name === baseLocale) {
+                  return `
+                    <th class="th-locale">
+                      ${l.name}
+                      <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>
+                    </th>
+                  `;
+                }
+                const progress = translatingLocales[l.name];
+                if (progress) {
+                  return `
+                    <th class="th-locale">
+                      ${l.name}
+                      <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" disabled>
+                        <span class="spinner"></span> ${progress.current}/${progress.total}
+                      </button>
+                    </th>
+                  `;
+                }
+                return `
+                  <th class="th-locale">
+                    ${l.name}
+                    <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" title="Translate all missing keys with AI">✨ Translate Missing</button>
+                  </th>
+                `;
+              }).join('')}
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
         </table>
       </div>
     `;
+
+    const wrapper = el.querySelector('.table-wrapper');
+    if (wrapper) {
+      wrapper.addEventListener('scroll', () => {
+        lastScrollTop = wrapper.scrollTop;
+        lastScrollLeft = wrapper.scrollLeft;
+      });
+      requestAnimationFrame(() => {
+        if (lastScrollTop !== undefined) wrapper.scrollTop = lastScrollTop;
+        if (lastScrollLeft !== undefined) wrapper.scrollLeft = lastScrollLeft;
+      });
+    }
 
     const tbody = el.querySelector('#table-body');
     const fragment = document.createDocumentFragment();
@@ -170,20 +206,24 @@ export function TranslationEditor() {
 
         if (!confirm(`Translate ${numMissing} missing keys for ${targetLocale} with AI? This may take a moment.`)) return;
 
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Translating...';
+        translatingLocales[targetLocale] = { current: 0, total: numMissing };
+        scheduleRender();
 
+        let completed = 0;
         try {
-          const results = await aiService.batchTranslate(missingEntries, baseLocale, targetLocale);
-          // Update translations
-          Object.entries(results).forEach(([k, v]) => {
-            translationService.updateTranslation(targetLocale, k, v);
-          });
-          Toast.success(`Successfully translated ${numMissing} keys to ${targetLocale}`);
+          for (const [key, baseVal] of Object.entries(missingEntries)) {
+            const translated = await aiService.translate(baseVal, baseLocale, targetLocale);
+            completed++;
+            translatingLocales[targetLocale].current = completed;
+            translationService.updateTranslation(targetLocale, key, translated);
+          }
+          Toast.success(`Successfully translated ${completed} keys to ${targetLocale}`);
         } catch (err) {
           Toast.error(err.message);
         } finally {
-          scheduleRender();
+          delete translatingLocales[targetLocale];
+          // Trigger a global re-render to restore button state
+          store.set('locales', [...store.get('locales')]);
         }
       });
     });
