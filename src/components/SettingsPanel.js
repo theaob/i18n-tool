@@ -42,6 +42,9 @@ export function SettingsPanel(onBack) {
             <option value="gemini-1.5-flash-latest" ${currentModel === 'gemini-1.5-flash-latest' ? 'selected' : ''}>Gemini 1.5 Flash</option>
             <option value="gemini-pro" ${currentModel === 'gemini-pro' ? 'selected' : ''}>Gemini Pro 1.0 (Legacy)</option>
           </select>
+          <button class="btn btn-secondary btn-sm" id="fetch-models-btn" style="margin-top:8px;gap:6px">
+            🔄 Refresh Models from Google API
+          </button>
         </div>
         <button class="btn btn-primary btn-sm" id="save-api-key" style="margin-top:16px">Save AI Settings</button>
       </div>
@@ -97,7 +100,47 @@ export function SettingsPanel(onBack) {
       </div>
     `;
 
+    // Retrieve cached models list if stored
+    const cachedModels = store.get('geminiAvailableModels') || [];
+    if (cachedModels.length > 0) {
+      const select = el.querySelector('#gemini-model');
+      select.innerHTML = cachedModels.map(m => `
+        <option value="${m.name}" ${currentModel === m.name ? 'selected' : ''}>${m.displayName}</option>
+      `).join('');
+    }
+
     el.querySelector('#back-btn').addEventListener('click', onBack);
+
+    // Fetch dynamic models
+    el.querySelector('#fetch-models-btn').addEventListener('click', async () => {
+      const key = el.querySelector('#gemini-key').value.trim();
+      if (!key) {
+        Toast.error('Please enter an API key first');
+        return;
+      }
+      const btn = el.querySelector('#fetch-models-btn');
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Querying Google API...';
+      try {
+        const fetched = await window.electronAPI.fetchModels(key);
+        if (fetched && fetched.length > 0) {
+          store.set('geminiAvailableModels', fetched);
+          await window.electronAPI.setSetting('geminiAvailableModels', fetched);
+          const select = el.querySelector('#gemini-model');
+          select.innerHTML = fetched.map(m => `
+            <option value="${m.name}" ${currentModel === m.name ? 'selected' : ''}>${m.displayName}</option>
+          `).join('');
+          Toast.success(`Found ${fetched.length} models supporting translation`);
+        } else {
+          Toast.warning('No compatible models returned by the API');
+        }
+      } catch (err) {
+        Toast.error(`Failed to retrieve models: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Refresh Models from Google API';
+      }
+    });
 
     // AI save
     el.querySelector('#save-api-key').addEventListener('click', async () => {

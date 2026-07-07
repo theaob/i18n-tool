@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // AI Translation
   translate: (args) => ipcRenderer.invoke('ai:translate', args),
   batchTranslate: (args) => ipcRenderer.invoke('ai:batchTranslate', args),
+  fetchModels: (apiKey) => ipcRenderer.invoke('ai:fetchModels', apiKey),
 
   // Settings persistence
   getSetting: (key) => ipcRenderer.invoke('store:get', key),

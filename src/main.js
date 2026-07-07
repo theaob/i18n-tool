@@ -16,6 +16,12 @@ async function initTheme() {
 
   const apiKey = await window.electronAPI.getSetting('geminiApiKey') || '';
   store.set('geminiApiKey', apiKey);
+
+  const cachedModels = await window.electronAPI.getSetting('geminiAvailableModels') || [];
+  store.set('geminiAvailableModels', cachedModels);
+
+  const model = await window.electronAPI.getSetting('geminiModel') || 'gemini-2.0-flash';
+  store.set('geminiModel', model);
 }
 
 // ── View state ────────────────────────────────────────────────────────────────

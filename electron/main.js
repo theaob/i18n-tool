@@ -129,6 +129,27 @@ ipcMain.handle('ai:batchTranslate', async (_event, { entries, sourceLang, target
   return batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model });
 });
 
+ipcMain.handle('ai:fetchModels', async (_event, apiKey) => {
+  if (!apiKey) return [];
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return (data.models || [])
+      .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+      .map(m => ({
+        name: m.name.replace('models/', ''),
+        displayName: m.displayName || m.name.replace('models/', '')
+      }));
+  } catch (err) {
+    console.error('Failed to list Gemini models:', err);
+    throw err;
+  }
+});
+
 ipcMain.handle('store:get', (_event, key) => {
   return store ? store.get(key) : undefined;
 });
