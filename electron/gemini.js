@@ -10,7 +10,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  * @param {string} [opts.model] - The Gemini model to use
  * @returns {Promise<string>} - Translated string
  */
-async function translateWithGemini({ text, sourceLang, targetLang, apiKey, model = 'gemini-2.0-flash' }) {
+async function translateWithGemini({ text, sourceLang, targetLang, apiKey, model = 'gemini-3.1-flash' }) {
   if (!apiKey) throw new Error('Gemini API key is not configured. Go to Settings to add it.');
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -42,7 +42,7 @@ Source string: ${text}`;
  * @param {string} [opts.model]
  * @returns {Promise<Record<string,string>>} - { key: translatedText }
  */
-async function batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model = 'gemini-2.0-flash' }) {
+async function batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model = 'gemini-3.1-flash' }) {
   if (!apiKey) throw new Error('Gemini API key is not configured.');
 
   const genAI = new GoogleGenerativeAI(apiKey);
