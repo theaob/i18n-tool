@@ -101,13 +101,20 @@ export function SettingsPanel(onBack) {
     `;
 
     // Retrieve cached models list if stored
+    let selectedModel = currentModel;
     const cachedModels = store.get('geminiAvailableModels') || [];
+    const select = el.querySelector('#gemini-model');
+
     if (cachedModels.length > 0) {
-      const select = el.querySelector('#gemini-model');
       select.innerHTML = cachedModels.map(m => `
-        <option value="${m.name}" ${currentModel === m.name ? 'selected' : ''}>${m.displayName}</option>
+        <option value="${m.name}" ${selectedModel === m.name ? 'selected' : ''}>${m.displayName}</option>
       `).join('');
     }
+
+    // Keep track of the user's active selection
+    select.addEventListener('change', (e) => {
+      selectedModel = e.target.value;
+    });
 
     el.querySelector('#back-btn').addEventListener('click', onBack);
 
@@ -126,10 +133,15 @@ export function SettingsPanel(onBack) {
         if (fetched && fetched.length > 0) {
           store.set('geminiAvailableModels', fetched);
           await window.electronAPI.setSetting('geminiAvailableModels', fetched);
-          const select = el.querySelector('#gemini-model');
+          
+          // Use the latest selectedModel instead of currentModel to preserve selection
           select.innerHTML = fetched.map(m => `
-            <option value="${m.name}" ${currentModel === m.name ? 'selected' : ''}>${m.displayName}</option>
+            <option value="${m.name}" ${selectedModel === m.name ? 'selected' : ''}>${m.displayName}</option>
           `).join('');
+          
+          // Re-update the selectedModel to the select value in case the previous selection is not in the list
+          selectedModel = select.value;
+
           Toast.success(`Found ${fetched.length} models supporting translation`);
         } else {
           Toast.warning('No compatible models returned by the API');
@@ -145,11 +157,10 @@ export function SettingsPanel(onBack) {
     // AI save
     el.querySelector('#save-api-key').addEventListener('click', async () => {
       const key = el.querySelector('#gemini-key').value.trim();
-      const model = el.querySelector('#gemini-model').value;
       store.set('geminiApiKey', key);
-      store.set('geminiModel', model);
+      store.set('geminiModel', selectedModel);
       await window.electronAPI.setSetting('geminiApiKey', key);
-      await window.electronAPI.setSetting('geminiModel', model);
+      await window.electronAPI.setSetting('geminiModel', selectedModel);
       Toast.success('AI settings saved');
     });
 
