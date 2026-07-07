@@ -41,6 +41,16 @@ export function Sidebar(onNavigate) {
           </button>
         </div>
       </div>
+      ${locales.length > 0 ? `
+        <div class="sidebar__base-selector">
+          <label for="base-locale-select">Base locale</label>
+          <select id="base-locale-select" class="form-select-sm">
+            ${locales.map(l => `
+              <option value="${l.name}" ${l.name === baseLocale ? 'selected' : ''}>${getFlag(l.name)} ${l.name}</option>
+            `).join('')}
+          </select>
+        </div>
+      ` : ''}
       <div class="sidebar__list" id="locale-list">
         ${locales.length === 0 ? `
           <div class="sidebar__empty">
@@ -72,6 +82,9 @@ export function Sidebar(onNavigate) {
 
     el.querySelector('#open-files-btn').addEventListener('click', openFiles);
     el.querySelector('#create-locale-btn')?.addEventListener('click', showCreateLocaleModal);
+    el.querySelector('#base-locale-select')?.addEventListener('change', (e) => {
+      store.set('baseLocale', e.target.value);
+    });
     el.querySelector('#settings-btn').addEventListener('click', () => onNavigate('settings'));
 
     el.querySelectorAll('.sidebar__item').forEach(item => {
