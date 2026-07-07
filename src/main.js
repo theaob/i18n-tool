@@ -170,16 +170,15 @@ function initDragDrop() {
     try {
       const files = await fileService.readDroppedFiles(targetFiles);
       const existing = store.get('locales') || [];
-      const existingNames = new Set(existing.map(l => l.name));
-      const newOnes = files.filter(f => !existingNames.has(f.name));
-      const merged = [...existing, ...newOnes];
+      const merged = fileService.mergeLocales(existing, files);
       store.set('locales', merged);
       if (!store.get('baseLocale') && merged.length > 0) store.set('baseLocale', merged[0].name);
       if (!store.get('activeLocale') && merged.length > 0) {
         store.set('activeLocale', merged.length > 1 ? merged[1].name : merged[0].name);
       }
       navigate('editor');
-      Toast.success(`Loaded ${files.length} file(s)`);
+      const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
+      Toast.success(`Loaded ${fileCount} file(s)`);
     } catch (err) {
       Toast.error(`Failed to load files: ${err.message}`);
     }
@@ -196,16 +195,14 @@ function initKeyboardShortcuts() {
     }
     if (meta && e.key === 'o') {
       e.preventDefault();
-      const { Sidebar } = await import('./components/Sidebar.js');
-      // trigger open via store event is simplest:
       const files = await fileService.openFiles();
       if (files.length) {
         const existing = store.get('locales') || [];
-        const existingNames = new Set(existing.map(l => l.name));
-        const merged = [...existing, ...files.filter(f => !existingNames.has(f.name))];
+        const merged = fileService.mergeLocales(existing, files);
         store.set('locales', merged);
         navigate('editor');
-        Toast.success(`Loaded ${files.length} file(s)`);
+        const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
+        Toast.success(`Loaded ${fileCount} file(s)`);
       }
     }
     if (meta && e.key === 'n') {

@@ -1,6 +1,6 @@
 // Reactive state store — observer pattern
 const _state = {
-  locales: [],          // [{ name, path, data: { key: value } }]
+  locales: [],          // [{ name, path, data: { key: value }, meta, sourceFiles?: [{ feature, path, meta, keys }] }]
   baseLocale: null,     // string locale name
   activeLocale: null,   // string locale name
   selectedKey: null,    // string key

@@ -4,11 +4,19 @@ import { fileService } from './fileService.js';
 export const exportService = {
   /**
    * Saves a locale's data back to its original file path.
+   * For merged locales (with sourceFiles), saves each source file separately.
    */
   async exportJson(localeName) {
     const locales = store.get('locales');
     const locale = locales.find(l => l.name === localeName);
     if (!locale) return;
+
+    // Merged locale — save each source file
+    if (locale.sourceFiles && locale.sourceFiles.length > 0) {
+      return fileService.saveMergedLocale(locale);
+    }
+
+    // Regular locale — save to single file
     return fileService.saveFile(locale.path, locale.data, locale.meta);
   },
 

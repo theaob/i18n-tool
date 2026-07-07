@@ -34,27 +34,33 @@ export function unflattenJson(flat) {
   return result;
 }
 
+import { groupByLanguage } from './langDetect.js';
+
 export const fileService = {
   /**
    * Opens the native file dialog and returns parsed locale data.
-   * @returns {Promise<Array<{name, path, data, meta}>>}
+   * Files with feature+lang naming (e.g. AuthEN.ts) are automatically
+   * grouped into merged locale objects by language.
+   * @returns {Promise<Array<{name, path, data, meta, sourceFiles?}>>}
    */
   async openFiles() {
     const files = await window.electronAPI.openFiles();
-    return Promise.all(files.map(async ({ name, path: filePath, content, ext }) => {
+    const parsed = await Promise.all(files.map(async ({ name, path: filePath, content, ext }) => {
       if (ext === '.ts') {
-        const parsed = await window.electronAPI.parseTs(content);
-        return { name, path: filePath, data: flattenJson(parsed.data), meta: parsed.meta };
+        const result = await window.electronAPI.parseTs(content);
+        return { name, path: filePath, data: flattenJson(result.data), meta: result.meta };
       } else {
-        let parsed = {};
-        try { parsed = JSON.parse(content); } catch { /* invalid JSON */ }
-        return { name, path: filePath, data: flattenJson(parsed), meta: { format: 'json' } };
+        let result = {};
+        try { result = JSON.parse(content); } catch { /* invalid JSON */ }
+        return { name, path: filePath, data: flattenJson(result), meta: { format: 'json' } };
       }
     }));
+    return groupByLanguage(parsed);
   },
 
   /**
    * Saves a locale back to disk.
+   * For regular (non-merged) locales, writes to the single file path.
    * @param {string} filePath - Original path (null to open save dialog)
    * @param {object} flatData - Flat key-value translation object
    * @param {object} meta - Locale format metadata
@@ -97,7 +103,34 @@ export const fileService = {
   },
 
   /**
+   * Saves a merged locale by writing each source file separately.
+   * Extracts the feature-prefixed keys belonging to each source file,
+   * strips the prefix, unflattens, and saves.
+   * @param {object} locale - Merged locale object with sourceFiles
+   * @returns {Promise<Array<{success, path}>>}
+   */
+  async saveMergedLocale(locale) {
+    if (!locale.sourceFiles || locale.sourceFiles.length === 0) {
+      return [];
+    }
+    const results = [];
+    for (const sf of locale.sourceFiles) {
+      const prefix = `${sf.feature}.`;
+      const featureData = {};
+      for (const [key, val] of Object.entries(locale.data)) {
+        if (key.startsWith(prefix)) {
+          featureData[key.slice(prefix.length)] = val;
+        }
+      }
+      const result = await this.saveFile(sf.path, featureData, sf.meta);
+      results.push(result);
+    }
+    return results;
+  },
+
+  /**
    * Imports JSON or TS files dropped onto the window.
+   * Files with feature+lang naming are automatically grouped.
    * @param {FileList} fileList
    */
   async readDroppedFiles(fileList) {
@@ -119,6 +152,48 @@ export const fileService = {
       const name = file.name.replace(/\.(json|ts)$/, '');
       results.push({ name, path: null, data: flattenJson(data), meta });
     }
-    return results;
+    return groupByLanguage(results);
+  },
+
+  /**
+   * Merges newly loaded locales into existing ones.
+   * For merged locales (with sourceFiles), merges source files from new
+   * entries into existing locale entries of the same language.
+   * For regular locales, deduplicates by name.
+   * @param {Array} existing - Current locales from store
+   * @param {Array} newFiles - Newly loaded locale objects
+   * @returns {Array} - Merged locales array
+   */
+  mergeLocales(existing, newFiles) {
+    const merged = [...existing];
+
+    for (const newLocale of newFiles) {
+      const existingIdx = merged.findIndex(l => l.name === newLocale.name);
+      if (existingIdx >= 0) {
+        const existing = merged[existingIdx];
+        // Both are merged locales — merge sourceFiles and data
+        if (newLocale.sourceFiles && existing.sourceFiles) {
+          const existingFeatures = new Set(existing.sourceFiles.map(sf => sf.feature));
+          for (const sf of newLocale.sourceFiles) {
+            if (!existingFeatures.has(sf.feature)) {
+              existing.sourceFiles.push(sf);
+              // Add the prefixed keys
+              const prefix = `${sf.feature}.`;
+              for (const [key, val] of Object.entries(newLocale.data)) {
+                if (key.startsWith(prefix)) {
+                  existing.data[key] = val;
+                }
+              }
+            }
+          }
+        }
+        // else: same name, skip duplicate regular file
+      } else {
+        merged.push(newLocale);
+      }
+    }
+
+    return merged;
   },
 };
+

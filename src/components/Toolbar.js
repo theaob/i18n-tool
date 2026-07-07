@@ -104,9 +104,15 @@ export function Toolbar() {
           if (type === 'json') {
             const locales = store.get('locales') || [];
             const locale = locales.find(l => l.name === activeLocale);
-            const format = locale?.meta?.format || 'json';
             const result = await exportService.exportJson(activeLocale);
-            if (result?.success) Toast.success(`Saved ${activeLocale}.${format}`);
+            if (locale?.sourceFiles) {
+              // Merged locale — result is an array
+              const saved = Array.isArray(result) ? result.filter(r => r?.success).length : 0;
+              if (saved > 0) Toast.success(`Saved ${saved} file(s) for ${activeLocale}`);
+            } else {
+              const format = locale?.meta?.format || 'json';
+              if (result?.success) Toast.success(`Saved ${activeLocale}.${format}`);
+            }
           } else if (type === 'csv') {
             const result = await exportService.exportCsv();
             if (result?.success) Toast.success('Exported CSV');

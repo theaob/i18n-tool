@@ -56,7 +56,35 @@ export function TranslationEditor() {
     const tbody = el.querySelector('#table-body');
     const fragment = document.createDocumentFragment();
 
+    // Determine if we need feature grouping
+    const hasFeatureGroups = (base?.sourceFiles || active?.sourceFiles);
+
+    let lastFeature = null;
+
     keys.forEach(key => {
+      // Insert feature group header if needed
+      if (hasFeatureGroups) {
+        const dotIdx = key.indexOf('.');
+        const feature = dotIdx > 0 ? key.slice(0, dotIdx) : null;
+        if (feature && feature !== lastFeature) {
+          lastFeature = feature;
+          const headerTr = document.createElement('tr');
+          headerTr.className = 'feature-group-header';
+          const featureKeys = keys.filter(k => k.startsWith(`${feature}.`));
+          const missingCount = baseLocale && activeLocale && baseLocale !== activeLocale
+            ? featureKeys.filter(k => translationService.getKeyStatus(k, baseLocale, activeLocale) === 'missing').length
+            : 0;
+          headerTr.innerHTML = `
+            <td colspan="4" class="feature-group-cell">
+              <span class="feature-group-name">📁 ${feature}</span>
+              <span class="feature-group-count">${featureKeys.length} keys</span>
+              ${missingCount > 0 ? `<span class="feature-group-missing">⚠ ${missingCount} missing</span>` : ''}
+            </td>
+          `;
+          fragment.appendChild(headerTr);
+        }
+      }
+
       const baseVal = base?.data[key] ?? '';
       const activeVal = active?.data[key] ?? '';
       const status = baseLocale && activeLocale && baseLocale !== activeLocale
@@ -71,11 +99,16 @@ export function TranslationEditor() {
         untranslated: '<span class="badge badge-same">≈</span>',
       }[status];
 
+      // Show the display key (strip feature prefix for grouped views)
+      const displayKey = hasFeatureGroups && key.indexOf('.') > 0
+        ? key.slice(key.indexOf('.') + 1)
+        : key;
+
       const tr = document.createElement('tr');
       tr.className = `${rowClass} ${isSelected ? 'selected' : ''}`;
       tr.dataset.key = key;
       tr.innerHTML = `
-        <td class="td-key" title="${key}">${key}</td>
+        <td class="td-key" title="${key}">${displayKey}</td>
         <td class="td-value ${!baseVal ? 'empty' : ''}" title="${baseVal}">${baseVal || '—'}</td>
         <td class="td-value ${!activeVal ? 'empty' : ''}" title="${activeVal}">${activeVal || '—'}</td>
         <td class="td-status">${badge}</td>

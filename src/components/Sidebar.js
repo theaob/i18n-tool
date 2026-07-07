@@ -41,11 +41,12 @@ export function Sidebar(onNavigate) {
         ` : locales.map(l => {
           const count = Object.keys(l.data).length;
           const isBase = l.name === baseLocale;
+          const fileCount = l.sourceFiles ? l.sourceFiles.length : 0;
           return `
             <div class="sidebar__item ${l.name === activeLocale ? 'active' : ''}"
                  data-locale="${l.name}" title="${l.path || l.name}">
               <span class="locale-flag">${getFlag(l.name)}</span>
-              <span class="locale-name">${l.name}${isBase ? ' <span style="font-size:10px;opacity:.6">(base)</span>' : ''}</span>
+              <span class="locale-name">${l.name}${isBase ? ' <span style="font-size:10px;opacity:.6">(base)</span>' : ''}${fileCount > 0 ? ` <span style="font-size:10px;opacity:.5">(${fileCount} files)</span>` : ''}</span>
               <span class="locale-count">${count}</span>
             </div>
           `;
@@ -87,9 +88,7 @@ export function Sidebar(onNavigate) {
       const files = await fileService.openFiles();
       if (!files.length) return;
       const existing = store.get('locales') || [];
-      const existingNames = new Set(existing.map(l => l.name));
-      const newOnes = files.filter(f => !existingNames.has(f.name));
-      const merged = [...existing, ...newOnes];
+      const merged = fileService.mergeLocales(existing, files);
       store.set('locales', merged);
       if (!store.get('baseLocale') && merged.length > 0) {
         store.set('baseLocale', merged[0].name);
@@ -98,7 +97,8 @@ export function Sidebar(onNavigate) {
         store.set('activeLocale', merged.length > 1 ? merged[1].name : merged[0].name);
       }
       onNavigate('editor');
-      Toast.success(`Loaded ${files.length} file(s)`);
+      const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
+      Toast.success(`Loaded ${fileCount} file(s)`);
     } catch (err) {
       Toast.error(`Failed to open files: ${err.message}`);
     }
