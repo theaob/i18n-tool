@@ -1,8 +1,11 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // File operations
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
+  // Electron removed File.path from the renderer's File objects; webUtils
+  // is the replacement for recovering a dropped file's real disk path.
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   saveFile: (args) => ipcRenderer.invoke('dialog:saveFile', args),
   saveCsv: (args) => ipcRenderer.invoke('dialog:saveCsv', args),
   parseTs: (content) => ipcRenderer.invoke('file:parseTs', content),

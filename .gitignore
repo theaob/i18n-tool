@@ -31,3 +31,6 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Local test/sample translation data (not part of the repo)
+/Translation Files*/

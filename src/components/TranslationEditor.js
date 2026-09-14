@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import { translationService } from '../services/translationService.js';
-import { aiService } from '../services/aiService.js';
+import { aiService, isCode } from '../services/aiService.js';
 import { Toast } from './Toast.js';
 
 // Module-level variables to persist across re-creation of TranslationEditor component
@@ -57,18 +57,18 @@ export function TranslationEditor() {
           <thead>
             <tr>
               <th class="th-key">Key</th>
-              ${orderedLocales.map((l, i) => {
-                if (l.name === baseLocale) {
-                  return `
+              ${orderedLocales.map(l => {
+      if (l.name === baseLocale) {
+        return `
                     <th class="th-locale">
                       ${l.name}
                       <span style="font-weight:400;text-transform:none;font-size:10px">(base)</span>
                     </th>
                   `;
-                }
-                const progress = translatingLocales[l.name];
-                if (progress) {
-                  return `
+      }
+      const progress = translatingLocales[l.name];
+      if (progress) {
+        return `
                     <th class="th-locale">
                       ${l.name}
                       <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" disabled>
@@ -76,14 +76,14 @@ export function TranslationEditor() {
                       </button>
                     </th>
                   `;
-                }
-                return `
+      }
+      return `
                   <th class="th-locale">
                     ${l.name}
                     <button class="btn btn-ghost btn-sm btn-translate-all" data-locale="${l.name}" style="padding:0px 6px;margin-left:6px;font-size:10px" title="Translate all missing keys with AI">✨ Translate Missing</button>
                   </th>
                 `;
-              }).join('')}
+    }).join('')}
             </tr>
           </thead>
           <tbody id="table-body"></tbody>
@@ -125,7 +125,7 @@ export function TranslationEditor() {
             orderedLocales.forEach(l => {
               if (l.name !== baseLocale) {
                 totalMissing += featureKeys.filter(k =>
-                  translationService.getKeyStatus(k, baseLocale, l.name) === 'missing'
+                    translationService.getKeyStatus(k, baseLocale, l.name) === 'missing'
                 ).length;
               }
             });
@@ -144,12 +144,12 @@ export function TranslationEditor() {
 
       // Show the display key (strip feature prefix for grouped views)
       const displayKey = hasFeatureGroups && key.indexOf('.') > 0
-        ? key.slice(key.indexOf('.') + 1)
-        : key;
+          ? key.slice(key.indexOf('.') + 1)
+          : key;
 
       // Determine if any non-base locale is missing this key
       const hasMissing = base && orderedLocales.some(l =>
-        l.name !== baseLocale && translationService.getKeyStatus(key, baseLocale, l.name) === 'missing'
+          l.name !== baseLocale && translationService.getKeyStatus(key, baseLocale, l.name) === 'missing'
       );
 
       const isSelected = key === selectedKey;
@@ -189,35 +189,108 @@ export function TranslationEditor() {
     el.querySelectorAll('.btn-translate-all').forEach(btn => {
       btn.addEventListener('click', async () => {
         const targetLocale = btn.dataset.locale;
-        
-        // Find missing keys
-        const missingEntries = {};
-        keys.forEach(key => {
-          if (translationService.getKeyStatus(key, baseLocale, targetLocale) === 'missing') {
-            missingEntries[key] = base.data[key];
-          }
-        });
+        if (!base) return;                              // no base selected
+        if (translatingLocales[targetLocale]) return;   // already running
 
-        const numMissing = Object.keys(missingEntries).length;
+        // Locales don't always agree on which keys exist (one language's
+        // file may simply be missing a key another has). When base itself
+        // lacks a key, fall back through the rest in a fixed priority:
+        // base itself, then EN > TR > AZ, then whatever else is loaded.
+        const priorityNames = [baseLocale, 'EN', 'TR', 'AZ', ...locales.map(l => l.name)]
+            .filter((name, idx, arr) => name && name !== targetLocale && arr.indexOf(name) === idx);
+        const sourceLocalesInOrder = priorityNames
+            .map(name => locales.find(l => l.name === name))
+            .filter(Boolean);
+
+        const missingKeys = keys.filter(
+            key => translationService.getKeyStatus(key, baseLocale, targetLocale) === 'missing'
+        );
+        const numMissing = missingKeys.length;
         if (numMissing === 0) {
           Toast.info(`No missing keys for ${targetLocale}`);
           return;
         }
 
-        if (!confirm(`Translate ${numMissing} missing keys for ${targetLocale} with AI? This may take a moment.`)) return;
+        // For each missing key, grab source text from the first locale in
+        // priority order that actually has a non-empty value, and group by
+        // that locale so each group can be translated with the right
+        // source language.
+        const missingEntries = {}; // flat key -> source text, for the code count below
+        const entriesBySourceLang = new Map(); // sourceLocaleName -> { key: text }
+        for (const key of missingKeys) {
+          const sourceLocale = sourceLocalesInOrder.find(l => (l.data[key] || '').trim());
+          if (!sourceLocale) continue; // no locale has any text for this key at all
+          missingEntries[key] = sourceLocale.data[key];
+          if (!entriesBySourceLang.has(sourceLocale.name)) entriesBySourceLang.set(sourceLocale.name, {});
+          entriesBySourceLang.get(sourceLocale.name)[key] = sourceLocale.data[key];
+        }
 
-        translatingLocales[targetLocale] = { current: 0, total: numMissing };
+        const numTranslatable = Object.keys(missingEntries).length;
+        if (numTranslatable === 0) {
+          Toast.warning(`None of the ${numMissing} missing keys for ${targetLocale} have source text in any loaded locale`);
+          return;
+        }
+
+        // How many will actually reach the API — standard codes are copied as-is
+        const numCodes = Object.entries(missingEntries)
+            .filter(([k, v]) => isCode(v, k)).length;
+        const numAI = numTranslatable - numCodes;
+        const numNoSource = numMissing - numTranslatable;
+        const noSourceNote = numNoSource > 0
+            ? ` ${numNoSource} have no source text in any loaded locale and will be skipped.`
+            : '';
+
+        const detail = numCodes > 0
+            ? `${numMissing} missing keys for ${targetLocale}: ${numCodes} are standard codes and will be copied as-is, ${numAI} will be translated with AI.${noSourceNote}`
+            : `Translate ${numTranslatable} missing keys for ${targetLocale} with AI?${noSourceNote}`;
+        if (!confirm(`${detail} Continue?`)) return;
+
+        translatingLocales[targetLocale] = { current: 0, total: numTranslatable };
         scheduleRender();
 
-        let completed = 0;
         try {
-          for (const [key, baseVal] of Object.entries(missingEntries)) {
-            const translated = await aiService.translate(baseVal, baseLocale, targetLocale);
-            completed++;
-            translatingLocales[targetLocale].current = completed;
-            translationService.updateTranslation(targetLocale, key, translated);
+          let doneSoFar = 0;
+          const translated = {};
+          // One batchTranslate call per source language, so each group is
+          // translated FROM the language it actually came from.
+          for (const [sourceLang, entries] of entriesBySourceLang) {
+            const groupTotal = Object.keys(entries).length;
+            const groupResult = await aiService.batchTranslate(
+                entries,
+                sourceLang,
+                targetLocale,
+                {
+                  chunkSize: 50,
+                  onProgress: (done) => {
+                    if (translatingLocales[targetLocale]) {
+                      translatingLocales[targetLocale].current = doneSoFar + done;
+                      scheduleRender();
+                    }
+                  },
+                  // Apply each chunk (and the instant code/cache hits) to the
+                  // store as soon as it lands, so translated rows appear
+                  // progressively instead of all popping in at the very end.
+                  onChunk: (partial) => {
+                    const toApply = Object.fromEntries(
+                        Object.entries(partial).filter(([, value]) => value)
+                    );
+                    if (Object.keys(toApply).length > 0) {
+                      translationService.updateTranslations(targetLocale, toApply);
+                    }
+                  },
+                }
+            );
+            Object.assign(translated, groupResult);
+            doneSoFar += groupTotal;
           }
-          Toast.success(`Successfully translated ${completed} keys to ${targetLocale}`);
+
+          const completed = Object.values(translated).filter(Boolean).length;
+
+          if (completed === numMissing) {
+            Toast.success(`Successfully translated ${completed} keys to ${targetLocale}`);
+          } else {
+            Toast.info(`Translated ${completed} of ${numMissing} keys to ${targetLocale}`);
+          }
         } catch (err) {
           Toast.error(err.message);
         } finally {

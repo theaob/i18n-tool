@@ -41,21 +41,33 @@ export const fileService = {
    * Opens the native file dialog and returns parsed locale data.
    * Files with feature+lang naming (e.g. AuthEN.ts) are automatically
    * grouped into merged locale objects by language.
-   * @returns {Promise<Array<{name, path, data, meta, sourceFiles?}>>}
+   *
+   * A file that fails to parse (e.g. a non-locale .ts file like an i18next
+   * bootstrap module) is skipped rather than failing the whole selection —
+   * one bad file shouldn't block loading the other 40.
+   *
+   * @returns {Promise<{ locales: Array<{name, path, data, meta, sourceFiles?}>, skipped: Array<{name, reason}> }>}
    */
   async openFiles() {
     const files = await window.electronAPI.openFiles();
-    const parsed = await Promise.all(files.map(async ({ name, path: filePath, content, ext }) => {
-      if (ext === '.ts') {
-        const result = await window.electronAPI.parseTs(content);
-        return { name, path: filePath, data: flattenJson(result.data), meta: result.meta };
-      } else {
-        let result = {};
-        try { result = JSON.parse(content); } catch { /* invalid JSON */ }
-        return { name, path: filePath, data: flattenJson(result), meta: { format: 'json' } };
+    const skipped = [];
+    const settled = await Promise.all(files.map(async ({ name, path: filePath, content, ext }) => {
+      try {
+        if (ext === '.ts') {
+          const result = await window.electronAPI.parseTs(content);
+          return { name, path: filePath, data: flattenJson(result.data), meta: result.meta };
+        } else {
+          let result = {};
+          try { result = JSON.parse(content); } catch { /* invalid JSON */ }
+          return { name, path: filePath, data: flattenJson(result), meta: { format: 'json' } };
+        }
+      } catch (err) {
+        skipped.push({ name, reason: err.message });
+        return null;
       }
     }));
-    return groupByLanguage(parsed);
+    const parsed = settled.filter(Boolean);
+    return { locales: groupByLanguage(parsed), skipped };
   },
 
   /**
@@ -131,28 +143,43 @@ export const fileService = {
   /**
    * Imports JSON or TS files dropped onto the window.
    * Files with feature+lang naming are automatically grouped.
+   *
+   * A file that fails to parse is skipped rather than aborting the whole
+   * drop — one bad file shouldn't block loading the rest.
+   *
    * @param {FileList} fileList
+   * @returns {Promise<{ locales: Array<{name, path, data, meta, sourceFiles?}>, skipped: Array<{name, reason}> }>}
    */
   async readDroppedFiles(fileList) {
     const results = [];
+    const skipped = [];
     for (const file of fileList) {
-      const text = await file.text();
-      const isTs = file.name.endsWith('.ts');
-      let data = {};
-      let meta = { format: 'json' };
-      
-      if (isTs) {
-        const parsed = await window.electronAPI.parseTs(text);
-        data = parsed.data;
-        meta = parsed.meta;
-      } else {
-        try { data = JSON.parse(text); } catch { /* invalid */ }
+      try {
+        const text = await file.text();
+        const isTs = file.name.endsWith('.ts');
+        let data = {};
+        let meta = { format: 'json' };
+
+        if (isTs) {
+          const parsed = await window.electronAPI.parseTs(text);
+          data = parsed.data;
+          meta = parsed.meta;
+        } else {
+          try { data = JSON.parse(text); } catch { /* invalid */ }
+        }
+
+        const name = file.name.replace(/\.(json|ts)$/, '');
+        // Recover the real disk path so a locale created later (e.g. adding
+        // a new language) saves next to the files it was dropped from,
+        // instead of losing that location and falling back to a save dialog.
+        let filePath = null;
+        try { filePath = window.electronAPI.getPathForFile(file) || null; } catch { /* not a real file */ }
+        results.push({ name, path: filePath, data: flattenJson(data), meta });
+      } catch (err) {
+        skipped.push({ name: file.name, reason: err.message });
       }
-      
-      const name = file.name.replace(/\.(json|ts)$/, '');
-      results.push({ name, path: null, data: flattenJson(data), meta });
     }
-    return groupByLanguage(results);
+    return { locales: groupByLanguage(results), skipped };
   },
 
   /**

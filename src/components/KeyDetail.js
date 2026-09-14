@@ -98,7 +98,7 @@ export function KeyDetail() {
         btn.disabled = true;
 
         try {
-          const translated = await aiService.translate(baseVal, baseLocale, targetLocale);
+          const translated = await aiService.translate(baseVal, baseLocale, targetLocale, key);
           translationService.updateTranslation(targetLocale, key, translated);
           const ta = el.querySelector(`.detail-textarea[data-locale="${targetLocale}"]`);
           if (ta) ta.value = translated;

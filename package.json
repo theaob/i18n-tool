@@ -1,6 +1,6 @@
 {
   "name": "i18n-tool",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Enterprise i18n translation management desktop application",
   "main": "electron/main.js",
   "repository": {

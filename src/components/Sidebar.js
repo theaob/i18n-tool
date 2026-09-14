@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import { fileService } from '../services/fileService.js';
+import { applyLocaleDefaults, translationService } from '../services/translationService.js';
 import { Toast } from './Toast.js';
 import { Modal } from './Modal.js';
 
@@ -111,6 +112,13 @@ export function Sidebar(onNavigate) {
     const base = locales.find(l => l.name === baseLocale) || locales[0];
     if (!base) return;
 
+    // Union across ALL loaded locales, not just base — different locales
+    // often carry different, incomplete key sets for the same feature
+    // (e.g. one language's file missing keys another has), so the new
+    // locale should start from the fullest key set actually known, not
+    // whatever gaps the chosen base happens to have.
+    const unionKeyCount = translationService.getAllKeys().length;
+
     const body = document.createElement('div');
     body.innerHTML = `
       <div class="form-group">
@@ -118,7 +126,7 @@ export function Sidebar(onNavigate) {
         <input type="text" id="new-locale-input" class="form-input"
           placeholder="e.g. DE, FR, ZH-CN" style="text-transform:uppercase" />
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
-          The new locale will be created with all ${Object.keys(base.data).length} keys from <strong>${base.name}</strong> (empty values).
+          The new locale will be created with all ${unionKeyCount} keys known across every loaded locale (empty values), using <strong>${base.name}</strong>'s file layout as the template.
           ${base.sourceFiles ? `<br/>Source files will be created for each feature: ${base.sourceFiles.map(sf => sf.feature).join(', ')}` : ''}
         </div>
       </div>
@@ -159,9 +167,13 @@ export function Sidebar(onNavigate) {
   }
 
   function createLocale(code, base) {
-    // Build empty data with all keys from the base
+    // Build empty data from the UNION of keys across every loaded locale,
+    // not just base's own keys — locales frequently disagree on which
+    // keys exist per feature, and the new locale shouldn't silently
+    // inherit base's specific gaps.
+    const unionKeys = translationService.getAllKeys();
     const emptyData = {};
-    for (const key of Object.keys(base.data)) {
+    for (const key of unionKeys) {
       emptyData[key] = '';
     }
 
@@ -172,10 +184,26 @@ export function Sidebar(onNavigate) {
       meta: { format: base.meta?.format || 'json' },
     };
 
-    // For merged locales, create matching sourceFiles entries
+    // For merged locales, create matching sourceFiles entries. Union the
+    // sourceFiles across ALL loaded locales (keyed by feature) so a feature
+    // file that base itself is missing (e.g. base=AZ but only EN/TR shipped
+    // a file for this feature) still gets included, using whichever locale
+    // does have it as the path/format template — preferring base's own
+    // version when it exists.
+    const allLocales = store.get('locales') || [];
     if (base.sourceFiles && base.sourceFiles.length > 0) {
+      const byFeature = new Map();
+      for (const l of allLocales) {
+        if (!l.sourceFiles) continue;
+        for (const sf of l.sourceFiles) {
+          if (!byFeature.has(sf.feature) || l.name === base.name) {
+            byFeature.set(sf.feature, sf);
+          }
+        }
+      }
+
       newLocale.meta = { format: 'merged' };
-      newLocale.sourceFiles = base.sourceFiles.map(sf => {
+      newLocale.sourceFiles = Array.from(byFeature.values()).map(sf => {
         // Derive new file path: replace the old language suffix with the new code
         let newPath = null;
         if (sf.path) {
@@ -183,11 +211,15 @@ export function Sidebar(onNavigate) {
           const ext = sf.path.match(/\.[^.]+$/)?.[0] || '.ts';
           newPath = `${dir}/${sf.feature}${code}${ext}`;
         }
+        const prefix = `${sf.feature}.`;
+        const featureKeys = unionKeys
+            .filter(k => k.startsWith(prefix))
+            .map(k => k.slice(prefix.length));
         return {
           feature: sf.feature,
           path: newPath,
           meta: { ...sf.meta },
-          keys: [...sf.keys],
+          keys: featureKeys,
         };
       });
     }
@@ -201,17 +233,15 @@ export function Sidebar(onNavigate) {
 
   async function openFiles() {
     try {
-      const files = await fileService.openFiles();
+      const { locales: files, skipped } = await fileService.openFiles();
+      if (skipped.length > 0) {
+        Toast.warning(`Skipped ${skipped.length} file(s) that aren't valid locale files: ${skipped.map(s => s.name).join(', ')}`);
+      }
       if (!files.length) return;
       const existing = store.get('locales') || [];
       const merged = fileService.mergeLocales(existing, files);
       store.set('locales', merged);
-      if (!store.get('baseLocale') && merged.length > 0) {
-        store.set('baseLocale', merged[0].name);
-      }
-      if (!store.get('activeLocale') && merged.length > 0) {
-        store.set('activeLocale', merged.length > 1 ? merged[1].name : merged[0].name);
-      }
+      applyLocaleDefaults(merged);
       onNavigate('editor');
       const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
       Toast.success(`Loaded ${fileCount} file(s)`);

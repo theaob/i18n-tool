@@ -1,5 +1,6 @@
 import { store } from './store.js';
 import { fileService } from './services/fileService.js';
+import { applyLocaleDefaults } from './services/translationService.js';
 import { Sidebar } from './components/Sidebar.js';
 import { Toolbar } from './components/Toolbar.js';
 import { TranslationEditor } from './components/TranslationEditor.js';
@@ -174,14 +175,15 @@ function initDragDrop() {
     if (!targetFiles.length) { Toast.warning('Only JSON and TS files are supported'); return; }
 
     try {
-      const files = await fileService.readDroppedFiles(targetFiles);
+      const { locales: files, skipped } = await fileService.readDroppedFiles(targetFiles);
+      if (skipped.length > 0) {
+        Toast.warning(`Skipped ${skipped.length} file(s) that aren't valid locale files: ${skipped.map(s => s.name).join(', ')}`);
+      }
+      if (!files.length) return;
       const existing = store.get('locales') || [];
       const merged = fileService.mergeLocales(existing, files);
       store.set('locales', merged);
-      if (!store.get('baseLocale') && merged.length > 0) store.set('baseLocale', merged[0].name);
-      if (!store.get('activeLocale') && merged.length > 0) {
-        store.set('activeLocale', merged.length > 1 ? merged[1].name : merged[0].name);
-      }
+      applyLocaleDefaults(merged);
       navigate('editor');
       const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
       Toast.success(`Loaded ${fileCount} file(s)`);
@@ -201,11 +203,15 @@ function initKeyboardShortcuts() {
     }
     if (meta && e.key === 'o') {
       e.preventDefault();
-      const files = await fileService.openFiles();
+      const { locales: files, skipped } = await fileService.openFiles();
+      if (skipped.length > 0) {
+        Toast.warning(`Skipped ${skipped.length} file(s) that aren't valid locale files: ${skipped.map(s => s.name).join(', ')}`);
+      }
       if (files.length) {
         const existing = store.get('locales') || [];
         const merged = fileService.mergeLocales(existing, files);
         store.set('locales', merged);
+        applyLocaleDefaults(merged);
         navigate('editor');
         const fileCount = files.reduce((acc, f) => acc + (f.sourceFiles ? f.sourceFiles.length : 1), 0);
         Toast.success(`Loaded ${fileCount} file(s)`);

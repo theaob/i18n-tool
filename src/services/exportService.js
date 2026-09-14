@@ -31,13 +31,23 @@ export const exportService = {
     locales.forEach(l => Object.keys(l.data).forEach(k => allKeys.add(k)));
     const keys = Array.from(allKeys).sort();
 
-    const headers = ['key', ...locales.map(l => l.name)];
+    // Excel picks the CSV field separator from the OS's regional "list
+    // separator" setting, not from the file itself. Turkish (and most
+    // European) Windows locales use a comma as the decimal separator, so
+    // Excel expects ";" for CSV — a comma-separated file opens as one
+    // giant column instead of splitting into cells.
+    const DELIM = ';';
+    const quote = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const headers = ['key', ...locales.map(l => l.name)].map(quote);
     const rows = keys.map(key => [
-      key,
-      ...locales.map(l => `"${(l.data[key] || '').replace(/"/g, '""')}"`)
+      quote(key),
+      ...locales.map(l => quote(l.data[key] || ''))
     ]);
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    // UTF-8 BOM so Excel on Windows doesn't mis-detect the encoding and
+    // mangle non-ASCII characters (Turkish, Azerbaijani, ...).
+    const BOM = '﻿';
+    const csv = BOM + [headers.join(DELIM), ...rows.map(r => r.join(DELIM))].join('\n');
     return window.electronAPI.saveCsv({ content: csv });
   },
 };

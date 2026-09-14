@@ -1,4 +1,55 @@
 import { store } from '../store.js';
+import { isCode } from './aiService.js';
+
+/**
+ * Picks the most complete locale as the default base.
+ *
+ * Without this, the base locale was whichever file happened to be loaded
+ * first, so dropping a mostly-empty target file first made it the base —
+ * which silently broke missing-key detection and AI translation.
+ *
+ * Ranking: most non-empty values wins, EN breaks ties, then alphabetical.
+ *
+ * @param {Array<{name: string, data: Record<string,string>}>} locales
+ * @returns {string|null} Locale name, or null when there is nothing to pick.
+ */
+export function pickBaseLocale(locales) {
+  if (!locales || !locales.length) return null;
+
+  const score = l => Object.values(l.data || {}).filter(v => v && String(v).trim()).length;
+
+  return [...locales].sort((a, b) => {
+    const diff = score(b) - score(a);
+    if (diff !== 0) return diff;
+    if (a.name === 'EN') return -1;
+    if (b.name === 'EN') return 1;
+    return a.name.localeCompare(b.name);
+  })[0].name;
+}
+
+/**
+ * Applies default base/active locale after files are loaded.
+ * Base = most complete locale (EN wins ties), not whichever file
+ * happened to be dropped first. Active = first locale that isn't the base.
+ *
+ * Shared by every load path (drag & drop, Ctrl+O, sidebar "Open Files")
+ * so they can't drift out of sync with each other.
+ *
+ * @param {Array<{name: string, data: Record<string,string>}>} merged
+ */
+export function applyLocaleDefaults(merged) {
+  if (!merged || merged.length === 0) return;
+
+  if (!store.get('baseLocale')) {
+    store.set('baseLocale', pickBaseLocale(merged));
+  }
+
+  if (!store.get('activeLocale')) {
+    const base = store.get('baseLocale');
+    const firstOther = merged.find(l => l.name !== base);
+    store.set('activeLocale', (firstOther || merged[0]).name);
+  }
+}
 
 export const translationService = {
   /**
@@ -20,7 +71,7 @@ export const translationService = {
     const target = locales.find(l => l.name === targetLocaleName);
     if (!base || !target) return [];
     return Object.keys(base.data).filter(
-      k => !Object.prototype.hasOwnProperty.call(target.data, k) || target.data[k] === ''
+        k => !Object.prototype.hasOwnProperty.call(target.data, k) || target.data[k] === ''
     );
   },
 
@@ -33,7 +84,7 @@ export const translationService = {
     const target = locales.find(l => l.name === targetLocaleName);
     if (!base || !target) return [];
     return Object.keys(base.data).filter(
-      k => target.data[k] && target.data[k] === base.data[k]
+        k => target.data[k] && target.data[k] === base.data[k] && !isCode(base.data[k], k)
     );
   },
 
@@ -47,7 +98,7 @@ export const translationService = {
     if (!target) return 'missing';
     const targetVal = target.data[key];
     if (!targetVal) return 'missing';
-    if (base && targetVal === base.data[key]) return 'untranslated';
+    if (base && targetVal === base.data[key] && !isCode(base.data[key], key)) return 'untranslated';
     return 'ok';
   },
 
@@ -58,6 +109,21 @@ export const translationService = {
     const locales = store.get('locales').map(l => {
       if (l.name !== localeName) return l;
       return { ...l, data: { ...l.data, [key]: value } };
+    });
+    store.set('locales', locales);
+  },
+
+  /**
+   * Updates many translation values in one store write.
+   * Used after batch translation, where updating key-by-key would
+   * otherwise trigger one re-render per key.
+   * @param {string} localeName
+   * @param {Record<string,string>} entries { key: value }
+   */
+  updateTranslations(localeName, entries) {
+    const locales = store.get('locales').map(l => {
+      if (l.name !== localeName) return l;
+      return { ...l, data: { ...l.data, ...entries } };
     });
     store.set('locales', locales);
   },

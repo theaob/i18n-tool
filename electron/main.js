@@ -119,13 +119,13 @@ ipcMain.handle('dialog:saveCsv', async (_event, { content }) => {
   return { success: true, path: result.filePath };
 });
 
-ipcMain.handle('ai:translate', async (_event, { text, sourceLang, targetLang, apiKey, model }) => {
-  return translateWithGemini({ text, sourceLang, targetLang, apiKey, model });
+ipcMain.handle('ai:translate', async (_event, { text, sourceLang, targetLang, apiKey, model, key, hints }) => {
+  return translateWithGemini({ text, sourceLang, targetLang, apiKey, model, key, hints });
 });
 
-ipcMain.handle('ai:batchTranslate', async (_event, { entries, sourceLang, targetLang, apiKey, model }) => {
+ipcMain.handle('ai:batchTranslate', async (_event, { entries, sourceLang, targetLang, apiKey, model, hints }) => {
   const { batchTranslateWithGemini } = require('./gemini');
-  return batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model });
+  return batchTranslateWithGemini({ entries, sourceLang, targetLang, apiKey, model, hints });
 });
 
 ipcMain.handle('ai:fetchModels', async (_event, apiKey) => {
